@@ -31,7 +31,6 @@ use Pod::Usage;
 my @files;
 my @assemblies;
 my @rest;
-my @symlinks;	# TODO: remove after everything set up?
 
 find(\&wanted, @ARGV);
 
@@ -74,27 +73,29 @@ foreach my $assembly (@assemblies) {
 	print "$assembly: " . length($cont) . "\n";
 	foreach my $filename (@rest) {
 		my $basename = basename($filename);
-		my $pattern = $basename;
-		$pattern =~ s/\./\\./g;
+		next if $basename =~ /^\./;	# skip files starting with a dot
+		my @name_parts = split(/\./, $basename, 2);
+		my $pattern = $name_parts[0];
+		next unless $pattern =~ /[[:alpha:]]/;	# skip rest if no letters in $pattern
+		my $ext = '';
+		if (scalar @name_parts > 1) {
+			my $ext = $name_parts[1];
+		}
 		my @matches = $cont =~ m/[^[:alnum:]]$pattern[^[:alnum:]]/gi;
 		chop(@matches);
 		my @cleaned_matches = map substr($matches[$_], 1), 1..$#matches;
-		print scalar @cleaned_matches . " matches for " . $basename . " in " . $assembly . "\n";
+		print scalar @cleaned_matches . " matches for " . join('.', @name_parts) . " in " . $assembly . "\n";
 		foreach my $match (@cleaned_matches) {
-			if ($match ne $basename) {
-				my $matchpath = dirname($filename) . '/' . $match;
-				#push @symlinks, $matchpath
-					#if (!grep($_ eq $matchpath, @symlinks));
+			my $matchext = join('.', $match, $ext);
+			if ($matchext ne $basename) {
+				my $matchpath = dirname($filename) . '/' . $matchext;
 				unless (-e $matchpath) {
-					system("ln -s $basename $matchpath") == 0
+					system("ln -sf \"$basename\" \"$matchpath\"") == 0
 						or die "system failed: $?";
 				}
 			}
 		}
 	}
 }
-
-#print "@symlinks\n";
-#print "number of symlinks: " . scalar @symlinks . "\n";
 
 exit;
